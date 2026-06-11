@@ -10,11 +10,18 @@ void print_help(){
     printf("  ls [path]      List files and directories\n\r");
     printf("  cat <file>     Display file contents\n\r");
     printf("  cd <dir>       Change current directory\n\r");
+    printf("  mkdir <dir>    Create a new directory\n\r");
     printf("  pwd            Print current directory\n\r");
     printf("  help [cmd]     Show help information\n\r");
 }
 
-void runcmd(char* cmd, lfs_t lfs){
+void pathjoin(char* buf, const char* a, const char* b){
+    strcpy(buf, a);
+    if(a[0] != '/') strcat(buf, "/");
+    strcat(buf, b);
+}
+
+void runcmd(char* cmd, lfs_t *lfs){
     int pos = 0;
     int len = strlen(cmd);
     while(pos < len && cmd[pos] != ' '&& cmd[pos] != '\n' && cmd[pos] != '\r'){pos++;}
@@ -22,6 +29,8 @@ void runcmd(char* cmd, lfs_t lfs){
     while(pos2 < len && cmd[pos2] != ' '&& cmd[pos2] != '\n' && cmd[pos2] != '\r'){pos2++;}
     cmd[pos2] = '\0';
     char* cmd2 = cmd+pos+1;
+    int cmd2len = strlen(cmd2);
+    char newpath[100];
 
     if(strncmp(cmd, "ls", 2) == 0){
         listdir(lfs, getcwd());
@@ -34,6 +43,15 @@ void runcmd(char* cmd, lfs_t lfs){
     }
     else if(strncmp(cmd, "pwd", 2) == 0){
         printf("CWD: %s\n\r", getcwd());
+    }
+    else if(strncmp(cmd, "mkdir", 2) == 0){
+        if(cmd2len == 0){
+            printf("Usage mkdir <dir>\n\r");
+        }
+        else{
+            pathjoin(newpath, getcwd(), cmd2);
+            makedir(lfs, newpath);
+        }
     }
     else if(strncmp(cmd, "help", 2) == 0){
         print_help();
@@ -71,7 +89,7 @@ int main(){
     while (1) { 
         printf("%s# ", getcwd());
         fgets(s, sizeof(s), stdin);
-        runcmd(s, lfs);
+        runcmd(s, &lfs);
     }
 
 }

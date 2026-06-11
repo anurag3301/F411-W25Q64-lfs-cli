@@ -97,20 +97,35 @@ lfs_t setup_lfs(){
     return lfs;
 }
 
-void listdir(lfs_t lfs, const char* dirname){
+void listdir(lfs_t *lfs, const char* dirname){
     lfs_dir_t dir;
     struct lfs_info info;
 
-    lfs_dir_open(&lfs, &dir, dirname);
+    lfs_dir_open(lfs, &dir, dirname);
 
-    while (lfs_dir_read(&lfs, &dir, &info) > 0) {
+    while (lfs_dir_read(lfs, &dir, &info) > 0) {
         if(strcmp(info.name, ".") == 0 || strcmp(info.name, "..") == 0) continue;
         if(info.type == LFS_TYPE_REG) printf("r\t");
         else if(info.type == LFS_TYPE_DIR) printf("d\t");
         printf("%lu\t%s\n", info.size, info.name);
     }
 
-    lfs_dir_close(&lfs, &dir);
+    lfs_dir_close(lfs, &dir);
+}
+
+void makedir(lfs_t *lfs, const char *dirname){
+    int err = lfs_mkdir(lfs, dirname);
+
+    if (err == LFS_ERR_OK) {
+        printf("Directory created: %s\r\n", dirname);
+    }
+    else if (err == LFS_ERR_EXIST) {
+        printf("Directory already exists: %s\r\n", dirname);
+    }
+    else {
+        printf("Failed to create directory '%s' (err=%d)\r\n",
+               dirname, err);
+    }
 }
 
 const char* getcwd(){
