@@ -6,5 +6,6 @@
 
 lfs_t setup_lfs();
 const char* getcwd();
+void listdir(lfs_t lfs, const char* dir);
 
 #endif //__FSUTILS_H__

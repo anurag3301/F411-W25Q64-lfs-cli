@@ -14,7 +14,7 @@ void print_help(){
     printf("  help [cmd]     Show help information\n\r");
 }
 
-void runcmd(char* cmd){
+void runcmd(char* cmd, lfs_t lfs){
     int pos = 0;
     int len = strlen(cmd);
     while(pos < len && cmd[pos] != ' '&& cmd[pos] != '\n' && cmd[pos] != '\r'){pos++;}
@@ -24,8 +24,7 @@ void runcmd(char* cmd){
     char* cmd2 = cmd+pos+1;
 
     if(strncmp(cmd, "ls", 2) == 0){
-        printf("ls command\n\r");
-        printf("next: **%s**\n\r", cmd2);
+        listdir(lfs, getcwd());
     }
     else if(strncmp(cmd, "cat", 3) == 0){
         printf("cat command\n\r");
@@ -72,7 +71,7 @@ int main(){
     while (1) { 
         printf("%s# ", getcwd());
         fgets(s, sizeof(s), stdin);
-        runcmd(s);
+        runcmd(s, lfs);
     }
 
 }

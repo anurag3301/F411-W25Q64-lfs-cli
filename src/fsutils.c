@@ -97,6 +97,22 @@ lfs_t setup_lfs(){
     return lfs;
 }
 
+void listdir(lfs_t lfs, const char* dirname){
+    lfs_dir_t dir;
+    struct lfs_info info;
+
+    lfs_dir_open(&lfs, &dir, dirname);
+
+    while (lfs_dir_read(&lfs, &dir, &info) > 0) {
+        if(strcmp(info.name, ".") == 0 || strcmp(info.name, "..") == 0) continue;
+        if(info.type == LFS_TYPE_REG) printf("r\t");
+        else if(info.type == LFS_TYPE_DIR) printf("d\t");
+        printf("%lu\t%s\n", info.size, info.name);
+    }
+
+    lfs_dir_close(&lfs, &dir);
+}
+
 const char* getcwd(){
     return cwd;
 }
