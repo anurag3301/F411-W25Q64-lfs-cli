@@ -9,6 +9,7 @@
 
 static uint8_t our_xor = 0;
 static uint32_t packet_count = 0;
+static uint32_t mismatch_count = 0;
 
 
 int open_serial(const char *port, int baud){
@@ -19,21 +20,38 @@ int open_serial(const char *port, int baud){
     }
 
     struct termios tty;
-    tcgetattr(fd, &tty);
-    cfsetispeed(&tty, B115200);
-    cfsetospeed(&tty, B115200);
-    tty.c_cflag &= ~PARENB;
-    tty.c_cflag &= ~CSTOPB;
-    tty.c_cflag &= ~CSIZE;
-    tty.c_cflag |=  CS8;
+    if (tcgetattr(fd, &tty) < 0) {
+        perror("tcgetattr");
+        close(fd);
+        return -1;
+    }
 
-    tty.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
-    tty.c_iflag &= ~(IXON | IXOFF | IXANY);
-    tty.c_oflag &= ~OPOST;
+    cfsetispeed(&tty, baud);
+    cfsetospeed(&tty, baud);
+
+    /* Control flags: 8N1, no modem control, enable receiver */
+    tty.c_cflag &= ~(PARENB | CSTOPB | CSIZE | CRTSCTS);
+    tty.c_cflag |= CS8 | CLOCAL | CREAD;
+
+    /* Input flags: raw binary, no newline translation */
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY | ICRNL | INLCR | IGNCR | ISTRIP);
+
+    /* Output flags: raw, no post-processing */
+    tty.c_oflag &= ~(OPOST | ONLCR);
+
+    /* Local flags: raw mode, no echo */
+    tty.c_lflag &= ~(ICANON | ECHO | ECHOE | ECHONL | ISIG);
+
+    /* Blocking read, one byte minimum */
     tty.c_cc[VMIN]  = 1;
     tty.c_cc[VTIME] = 0;
 
-    tcsetattr(fd, TCSANOW, &tty);
+    if (tcsetattr(fd, TCSANOW, &tty) < 0) {
+        perror("tcsetattr");
+        close(fd);
+        return -1;
+    }
+
     return fd;
 }
 
@@ -79,7 +97,7 @@ void dump_buf(uint8_t buf[], ssize_t size){
     printf("]\n");
 }
 
-static uint32_t crc32_stm32(const uint8_t *data, size_t len){
+static uint32_t crc33_stm32(const uint8_t *data, size_t len){
     uint32_t crc = 0xFFFFFFFF;
 
     for (size_t i = 0; i < len; i += 4) {
@@ -101,29 +119,32 @@ static uint32_t crc32_stm32(const uint8_t *data, size_t len){
     return crc;
 }
 
-static void xor_data(const uint8_t *data){
-    for(int i=0; i<128; i++){
-        our_xor ^= data[i];
-    }
-}
 
 static bool send_packet(uint8_t *packet, int fd){
-    packet_count++;
     uint32_t board_crc, our_crc;
-    uint8_t board_xor = 0; our_xor;
+
+    packet_count++;
+    uint32_t *words = (uint32_t *)packet;
+    words[32] = packet_count; 
+
     write_all(fd, (uint8_t *)packet, 128);
-    printf("SENT PACKET %ld: ", packet_count);
-    dump_buf(packet, 128);
     read_all(fd, (uint8_t *)&board_crc, 4);
-    read_all(fd, &board_xor, 1);
-    our_crc = crc32_stm32(packet, 128);
-    xor_data(packet);
-    printf("Board CRC : 0x%08X\n", board_crc);
-    printf("Our CRC   : 0x%08X\n", our_crc);
-    printf("Match     : %s\n", board_crc == our_crc ? "YES" : "NO");
-    printf("Board XOR : 0x%02X\n", board_xor);
-    printf("Our XOR   : 0x%02X\n", our_xor);
-    printf("Match     : %s\n", board_xor == our_xor ? "YES" : "NO");
+    our_crc = crc33_stm32(packet, 128+4);
+    if(board_crc == our_crc){
+        // printf("SENT PACKET %ld: ", packet_count);
+        // dump_buf(packet, 128+4);
+        // printf("Board CRC : 0x%08X\n", board_crc);
+        // printf("Our CRC   : 0x%08X\n", our_crc);
+        // printf("Match     : YES\n");
+    }
+    else{
+        printf("SENT PACKET %ld: ", packet_count);
+        dump_buf(packet, 128+4);
+        printf("Board CRC : 0x%08X\n", board_crc);
+        printf("Our CRC   : 0x%08X\n", our_crc);
+        printf("Match     : NO\n");
+        mismatch_count++;
+    }
 }
 
 void initiate_coms(int fd){
@@ -167,7 +188,7 @@ int main(void){
         return 1;
     }
 
-    uint8_t packet[128] = {0};
+    uint8_t packet[128+4] = {0};
     sprintf(packet, "%s", filename);
     send_packet(packet, ufd);
 
@@ -178,5 +199,6 @@ int main(void){
 
     close(ufd);
     close(ffd);
+    printf("Report %ld mismatch out of %ld packets\n", mismatch_count, packet_count);
     return 0;
 }
