@@ -10,6 +10,9 @@ static W25Q_Config flash;
 static char cwd[100] = "/";
 static uint32_t packet_count = 0;
 
+static inline size_t min(size_t a, size_t b){
+    return (a < b) ? a : b;
+}
 
 static int32_t flash_spi_transfer(void          *user_context,
                                   const uint8_t *tx,
@@ -258,18 +261,24 @@ static uint32_t crc33_stm32(const uint8_t *data){
 
 
 static bool recv_packet(uint8_t *packet, UART_HandleTypeDef *huart){
-    packet_count++;
     HAL_StatusTypeDef status = HAL_UART_Receive(huart, packet, 128, 500);
-    if (status == HAL_TIMEOUT) return false;
-
+    if (status == HAL_TIMEOUT){
+        uint32_t crc = 0xFFFFFFFF;
+        HAL_UART_Transmit(huart, (uint8_t *)&crc, 4, HAL_MAX_DELAY);
+        return false;
+    }
+    packet_count++;
     uint32_t *words = (uint32_t *)packet;
     words[32] = packet_count; 
-    uint32_t crc = crc33_stm32(packet);
-    HAL_UART_Transmit(huart, (uint8_t *)&crc, 4, HAL_MAX_DELAY);
     return true;
 }
 
-void receive_file(UART_HandleTypeDef *huart){
+static void ack_packet(uint8_t *packet, UART_HandleTypeDef *huart){
+    uint32_t crc = crc33_stm32(packet);
+    HAL_UART_Transmit(huart, (uint8_t *)&crc, 4, HAL_MAX_DELAY);
+}
+
+void receive_file(lfs_t *lfs, UART_HandleTypeDef *huart){
     __HAL_RCC_CRC_CLK_ENABLE();
     packet_count = 0;
 
@@ -278,5 +287,35 @@ void receive_file(UART_HandleTypeDef *huart){
     HAL_UART_Transmit(huart, (uint8_t *)start_pattern, 4, HAL_MAX_DELAY);
 
     uint8_t packet[128+4];
-    while(recv_packet(packet, huart));
+    struct lfs_info info;
+    lfs_file_t file;
+
+    if(!recv_packet(packet, huart)) return;
+    packet[24] = '\0';
+
+    uint32_t filesize = ((uint32_t*)packet)[0];
+    char filename[21];
+    memcpy(filename, packet+4, 20);
+    filename[20] = '\0';
+
+    if (lfs_stat(lfs, filename, &info) == LFS_ERR_OK) {
+        uint32_t reject = 0xFFFFFFFF;
+        HAL_UART_Transmit(huart, (uint8_t *)&reject, 4, HAL_MAX_DELAY);
+        return;
+    }
+    if (lfs_file_open(lfs, &file, filename, LFS_O_WRONLY | LFS_O_CREAT) < 0) {
+        uint32_t reject = 0xFFFFFFFF;
+        HAL_UART_Transmit(huart, (uint8_t *)&reject, 4, HAL_MAX_DELAY);
+        return;
+    }
+
+    ack_packet(packet, huart);
+
+    while(recv_packet(packet, huart)){
+        lfs_file_write(lfs, &file, packet, min(128, (int32_t)filesize));
+        filesize -= 128;
+        ack_packet(packet, huart);
+    }
+
+    lfs_file_close(lfs, &file);
 }

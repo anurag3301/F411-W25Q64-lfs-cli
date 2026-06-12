@@ -6,11 +6,11 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
+#include <sys/stat.h>
 
 static uint8_t our_xor = 0;
 static uint32_t packet_count = 0;
 static uint32_t mismatch_count = 0;
-
 
 int open_serial(const char *port, int baud){
     int fd = open(port, O_RDWR | O_NOCTTY | O_SYNC);
@@ -171,6 +171,14 @@ void initiate_coms(int fd){
     tcflush(fd, TCIFLUSH);
 }
 
+uint32_t getFileSize(const char* path){
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        return st.st_size;
+    }
+    return 0;
+}
+
 int main(void){
     setvbuf(stdout, NULL, _IONBF, 0);
     char *port = "/dev/ttyACM0";
@@ -181,7 +189,7 @@ int main(void){
     initiate_coms(ufd);
     printf("Sending packets: %s\n", port);
 
-    char* filename = "file.tar.gz";
+    char* filename = "platformio.ini";
     int ffd = open(filename, O_RDONLY);
     if (ffd < 0) {
         perror("open");
@@ -189,7 +197,9 @@ int main(void){
     }
 
     uint8_t packet[128+4] = {0};
-    sprintf(packet, "%s", filename);
+    uint32_t *words = (uint32_t*)packet;
+    words[0] = getFileSize(filename);
+    sprintf(packet+4, "%s", filename);
     send_packet(packet, ufd);
 
     ssize_t n;

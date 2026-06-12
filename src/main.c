@@ -81,7 +81,7 @@ void runcmd(char* cmd, lfs_t *lfs){
         print_help();
     }
     else if(strncmp(cmd, "receive", 7) == 0){
-        receive_file(&huart1);
+        receive_file(lfs, &huart1);
     }
     else{
         printf("Unknown command \"%s\"! run \"help\"\n\r", cmd);
