@@ -7,6 +7,8 @@
 #include <fcntl.h>
 #include <termios.h>
 #include <sys/stat.h>
+#include <time.h>
+#include <sys/select.h>
 #define DEBUG   1
 
 enum FIO_ERR{
@@ -73,13 +75,10 @@ int write_all(int fd, const uint8_t *buf, size_t n){
 }
 
 int write_all_slow(int fd, const uint8_t *buf, size_t n){
-    size_t written = 0;
-    while (written < n) {
-        ssize_t r = write(fd, buf + written, n - written);
+    for(size_t i=0; i<n; i++){
+        write(fd, buf+i, 1);
         tcdrain(fd);
-        usleep(1000);
-        if (r < 0) { perror("write"); return -1; }
-        written += r;
+        usleep(2000);
     }
     return 0;
 }
@@ -161,25 +160,34 @@ static bool send_packet(uint8_t *packet, int fd){
 }
 
 void initiate_coms(int fd){
-    /* Send the command */
-    write_all_slow(fd, "\n\n\n", 3);
+    write_all_slow(fd, "\n", 1);
     tcdrain(fd);
+
+    uint8_t prev = 0, curr = 0;
+    for(;;){
+        read(fd, &curr, 1);
+        printf("%c", curr);
+        if(prev == '#' && curr == ' ') break;
+        prev = curr;
+    }
+    tcflush(fd, TCIFLUSH);
+
+    // now the board is idle and waiting, safe to send command
     const char *cmd = "receive\n";
     write_all_slow(fd, (uint8_t *)cmd, strlen(cmd));
     tcdrain(fd);
-    usleep(1000);
 
-    /* read bytes one at a time until we see R-D-Y in sequence */
     uint8_t window[4] = {0};
-    for (;;) {
+    for(;;){
         uint8_t b;
         read(fd, &b, 1);
+        printf("%c", b);
         window[0] = window[1];
         window[1] = window[2];
         window[2] = window[3];
         window[3] = b;
-        if (window[0]==0x95 && window[1]==0x54 && 
-            window[2]==0x95 && window[3]==0x54) break;
+        if(window[0]==0x95 && window[1]==0x54 &&
+           window[2]==0x95 && window[3]==0x54) break;
     }
     tcflush(fd, TCIFLUSH);
 }
@@ -202,7 +210,7 @@ int main(void){
     initiate_coms(ufd);
     printf("Sending packets: %s\n", port);
 
-    char* filename = "platformio.ini";
+    char* filename = "fileupload.c";
     int ffd = open(filename, O_RDONLY);
     if (ffd < 0) {
         perror("open");
