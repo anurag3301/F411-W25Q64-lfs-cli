@@ -28,7 +28,7 @@ void runcmd(char* cmd, lfs_t *lfs){
     cmd[pos2] = '\0';
     char* cmd2 = cmd+pos+1;
     int cmd2len = strlen(cmd2);
-    char newpath[100];
+    static char newpath[500];
 
     if(strncmp(cmd, "ls", 2) == 0){
         if(cmd2len == 0){

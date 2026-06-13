@@ -7,7 +7,7 @@ extern SPI_HandleTypeDef  spi1;
 static W25Q_LFS_Context lfs_ctx;
 static struct lfs_config       lfs_cfg;
 static W25Q_Config flash;
-static char cwd[100] = "/";
+static char cwd[500] = "/";
 static uint32_t packet_count = 0;
 
 static inline size_t min(size_t a, size_t b){
@@ -151,7 +151,7 @@ void changedir(lfs_t *lfs, const char* dir){
         return;
     }
 
-    char newpath[100];
+    static char newpath[500];
     struct lfs_info info;
     pathjoin(newpath, cwd, dir);
     int err = lfs_stat(lfs, newpath, &info);
@@ -289,6 +289,7 @@ void receive_file(lfs_t *lfs, UART_HandleTypeDef *huart){
     uint8_t packet[128+4];
     struct lfs_info info;
     lfs_file_t file;
+    static char newpath[500];
 
     if(!recv_packet(packet, huart)) return;
     packet[24] = '\0';
@@ -297,13 +298,14 @@ void receive_file(lfs_t *lfs, UART_HandleTypeDef *huart){
     char filename[21];
     memcpy(filename, packet+4, 20);
     filename[20] = '\0';
+    pathjoin(newpath, cwd, filename);
 
-    if (lfs_stat(lfs, filename, &info) == LFS_ERR_OK) {
+    if (lfs_stat(lfs, newpath, &info) == LFS_ERR_OK) {
         uint32_t reject = EXISTS_ERR;
         HAL_UART_Transmit(huart, (uint8_t *)&reject, 4, HAL_MAX_DELAY);
         return;
     }
-    if (lfs_file_open(lfs, &file, filename, LFS_O_WRONLY | LFS_O_CREAT) < 0) {
+    if (lfs_file_open(lfs, &file, newpath, LFS_O_WRONLY | LFS_O_CREAT) < 0) {
         uint32_t reject = CREATE_ERR;
         HAL_UART_Transmit(huart, (uint8_t *)&reject, 4, HAL_MAX_DELAY);
         return;
