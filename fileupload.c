@@ -159,10 +159,10 @@ static bool send_packet(uint8_t *packet, int fd){
     return true;
 }
 
-void initiate_coms(int fd){
+void initiate_coms(int fd, const char* cmd){
     write_all_slow(fd, "\n", 1);
     tcdrain(fd);
-
+    printf("\n||| START IGNORE RECEIVE BYTES |||\n");
     uint8_t prev = 0, curr = 0;
     for(;;){
         read(fd, &curr, 1);
@@ -172,8 +172,6 @@ void initiate_coms(int fd){
     }
     tcflush(fd, TCIFLUSH);
 
-    // now the board is idle and waiting, safe to send command
-    const char *cmd = "receive\n";
     write_all_slow(fd, (uint8_t *)cmd, strlen(cmd));
     tcdrain(fd);
 
@@ -190,6 +188,7 @@ void initiate_coms(int fd){
            window[2]==0x95 && window[3]==0x54) break;
     }
     tcflush(fd, TCIFLUSH);
+    printf("\n||| END IGNORE RECEIVE BYTES |||\n");
 }
 
 uint32_t getFileSize(const char* path){
@@ -200,17 +199,10 @@ uint32_t getFileSize(const char* path){
     return 0;
 }
 
-int main(void){
-    setvbuf(stdout, NULL, _IONBF, 0);
-    char *port = "/dev/ttyACM0";
-    int ufd = open_serial(port, B115200);
-    if (ufd < 0) return 1;
-    printf("Connected to: %s\n", port);
 
-    initiate_coms(ufd);
-    printf("Sending packets: %s\n", port);
-
-    char* filename = "fileupload.c";
+int send_file(int ufd, char *filename){
+    initiate_coms(ufd, "receive\n");
+    printf("\nSending packets!!\n");
     int ffd = open(filename, O_RDONLY);
     if (ffd < 0) {
         perror("open");
@@ -228,7 +220,22 @@ int main(void){
         if(!send_packet(packet, ufd)) return 1;
     }
 
-    close(ufd);
     close(ffd);
+    return 0;
+}
+
+int main(int argc, char* argv[]){
+    setvbuf(stdout, NULL, _IONBF, 0);
+    char *port = "/dev/ttyACM0";
+    int ufd = open_serial(port, B115200);
+    if (ufd < 0) return 1;
+    printf("Connected to: %s\n", port);
+
+    if(send_file(ufd, "platformio.ini") == 0){
+        printf("\nFile SENT successfully :)\n");
+    }
+
+
+    close(ufd);
     return 0;
 }
