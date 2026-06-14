@@ -9,6 +9,7 @@ static struct lfs_config       lfs_cfg;
 static W25Q_Config flash;
 static char cwd[500] = "/";
 static uint32_t packet_count = 0;
+static uint8_t pos = 0;
 
 static inline size_t min(size_t a, size_t b){
     return (a < b) ? a : b;
@@ -257,13 +258,11 @@ void touch(lfs_t *lfs, const char *path){
     printf("Created %s\r\n", path);
 }
 
-void lsr_print_callback(const char* path){
+void lsr_print_callback(const char* path, void* param){
     printf("%s\n\r", path);
 }
 
-void ls_recursive(lfs_t *lfs, const char *path, void(*callback)(const char*)){
-    struct lfs_info info;
-
+void ls_recursive(lfs_t *lfs, const char *path, void(*callback)(const char*, void*), void* param){
     lfs_dir_t dir;
 
     if(lfs_dir_open(lfs, &dir, path)){
@@ -283,10 +282,10 @@ void ls_recursive(lfs_t *lfs, const char *path, void(*callback)(const char*)){
         else
             snprintf(childpath, sizeof(childpath), "%s/%s", path, child.name);
         if(child.type == LFS_TYPE_REG){
-            callback(childpath);
+            callback(childpath, param);
         }
         else if(child.type == LFS_TYPE_DIR){
-            ls_recursive(lfs, childpath, callback);
+            ls_recursive(lfs, childpath, callback, param);
         }
     }
 
@@ -381,10 +380,55 @@ static bool recv_packet(uint8_t *packet, UART_HandleTypeDef *huart){
     return true;
 }
 
+static bool recv_packet_slow(uint8_t *packet, UART_HandleTypeDef *huart){
+    uint8_t data;
+    for(int i=0; i<128; i++){
+        HAL_UART_Receive(huart, &data, 1, HAL_MAX_DELAY);
+        if(data == '\n' || data == '\r') return false;
+        packet[i] = data;
+    }
+    packet_count++;
+    uint32_t *words = (uint32_t *)packet;
+    words[32] = packet_count; 
+    return true;
+}
+
 static void ack_packet(uint8_t *packet, UART_HandleTypeDef *huart){
     uint32_t crc = crc33_stm32(packet);
     HAL_UART_Transmit(huart, (uint8_t *)&crc, 4, HAL_MAX_DELAY);
 }
+
+void path_dump(char* path, void* param){
+    int len = strlen(path);
+    path[len] = '\n';
+    HAL_UART_Transmit((UART_HandleTypeDef *)param, (uint8_t*)path, len+1, HAL_MAX_DELAY);
+}
+
+void send_file(lfs_t *lfs, UART_HandleTypeDef *huart){
+    __HAL_RCC_CRC_CLK_ENABLE();
+    packet_count = 0;
+    printf("Sending files\n\r");
+    ls_recursive(lfs, "/", path_dump, huart);
+    uint8_t start_pattern[4] = {0x95, 0x54, 0x95, 0x54};
+    HAL_UART_Transmit(huart, start_pattern, 4, HAL_MAX_DELAY);
+    char path[512] = {0};
+    uint8_t packet[128+4];
+    for (int i = 0; i < 4; i++) {
+        if (!recv_packet_slow(packet, huart))
+            return;
+        if(i<3)ack_packet(packet, huart);    
+        memcpy(path + i * 128, packet, 128);
+    }
+    path[511] = '\0';
+    struct lfs_info info;
+    if (lfs_stat(lfs, path, &info) < 0) {
+        uint32_t reject = NOEXSITS_ERR;
+        HAL_UART_Transmit(huart, (uint8_t *)&reject, 4, HAL_MAX_DELAY);
+        return;
+    }
+    ack_packet(packet, huart);
+}
+
 
 void receive_file(lfs_t *lfs, UART_HandleTypeDef *huart){
     __HAL_RCC_CRC_CLK_ENABLE();

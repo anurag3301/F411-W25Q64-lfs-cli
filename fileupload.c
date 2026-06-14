@@ -15,10 +15,15 @@ enum FIO_ERR{
     TIMEOUT_ERR = 0xF1F1F1F1,
     EXISTS_ERR = 0xF2F2F2F2,
     CREATE_ERR = 0xF3F3F3F3,
+    NOEXSITS_ERR = 0xF4F4F4F4,
 };
 
 static uint8_t our_xor = 0;
 static uint32_t packet_count = 0;
+
+static inline size_t min(size_t a, size_t b){
+    return (a < b) ? a : b;
+}
 
 int open_serial(const char *port, int baud){
     int fd = open(port, O_RDWR | O_NOCTTY | O_SYNC);
@@ -151,6 +156,9 @@ static bool send_packet(uint8_t *packet, int fd){
         else if(board_crc == CREATE_ERR){
             printf("\nTerminated due to coundnt crate file!");
         }
+        else if(board_crc == NOEXSITS_ERR){
+            printf("\nTerminated due to file doesnt exsits!");
+        }
         else{
             printf("\nTerminated due to integrity mismatch, maybe retry!");
         }
@@ -224,6 +232,28 @@ int send_file(int ufd, char *filename){
     return 0;
 }
 
+
+int receive_file(int ufd){
+    initiate_coms(ufd, "send\n");
+    char path[512] = {0};
+    uint8_t packet[128+4] = {0};
+    printf("Enter filepath: ");
+    scanf("%511s", path);
+    printf("Requesting file [%s]\n", path);
+    size_t len = strlen(path) + 1;  // include '\0'
+    for (int i = 0; i < 4; i++) {
+        memset(packet, 0, sizeof(packet));
+        size_t offset = i * 128;
+        if (offset < len) {
+            memcpy(packet, path + offset, min(128, len - offset));
+        }
+        if (!send_packet(packet, ufd)) return 1;
+    }
+
+    printf("\nReceiving packets!!\n");
+    return 0;
+}
+
 int main(int argc, char* argv[]){
     setvbuf(stdout, NULL, _IONBF, 0);
     char *port = "/dev/ttyACM0";
@@ -231,10 +261,10 @@ int main(int argc, char* argv[]){
     if (ufd < 0) return 1;
     printf("Connected to: %s\n", port);
 
-    if(send_file(ufd, "platformio.ini") == 0){
-        printf("\nFile SENT successfully :)\n");
-    }
-
+    // if(send_file(ufd, "platformio.ini") == 0){
+    //     printf("\nFile SENT successfully :)\n");
+    // }
+    receive_file(ufd);
 
     close(ufd);
     return 0;

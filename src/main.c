@@ -32,11 +32,11 @@ void runcmd(char* cmd, lfs_t *lfs){
 
     if(strncmp(cmd, "lsr", 3) == 0){
         if(cmd2len == 0){
-            ls_recursive(lfs, getcwd(), lsr_print_callback);
+            ls_recursive(lfs, getcwd(), lsr_print_callback, 0x0);
         }
         else{
             pathjoin(newpath, getcwd(), cmd2);
-            ls_recursive(lfs, newpath, lsr_print_callback);
+            ls_recursive(lfs, newpath, lsr_print_callback, 0x0);
         }
     }
     else if(strncmp(cmd, "ls", 2) == 0){
@@ -102,6 +102,9 @@ void runcmd(char* cmd, lfs_t *lfs){
     }
     else if(strncmp(cmd, "receive", 7) == 0){
         receive_file(lfs, &huart1);
+    }
+    else if(strncmp(cmd, "send", 4) == 0){
+        send_file(lfs, &huart1);
     }
     else{
         printf("Unknown command \"%s\"! run \"help\"\n\r", cmd);
