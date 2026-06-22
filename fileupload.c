@@ -294,16 +294,41 @@ int receive_file(int ufd){
 
 int main(int argc, char* argv[]){
     setvbuf(stdout, NULL, _IONBF, 0);
-    char *port = "/dev/ttyACM0";
+
+    const char *port = NULL;
+    const char *upload_path = NULL;
+    bool do_download = false;
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
+            port = argv[++i];
+        } else if (strcmp(argv[i], "--upload") == 0 && i + 1 < argc) {
+            upload_path = argv[++i];
+        } else if (strcmp(argv[i], "--download") == 0) {
+            do_download = true;
+        } else {
+            fprintf(stderr, "Usage: %s --port <dev> --upload <path> | --download\n", argv[0]);
+            return 1;
+        }
+    }
+
+    if (!port || (!upload_path && !do_download)) {
+        fprintf(stderr, "Usage: %s --port <dev> --upload <path> | --download\n", argv[0]);
+        return 1;
+    }
+
     int ufd = open_serial(port, B115200);
     if (ufd < 0) return 1;
     printf("Connected to: %s\n", port);
 
-    // if(send_file(ufd, "platformio.ini") == 0){
-    //     printf("\nFile SENT successfully :)\n");
-    // }
-    receive_file(ufd);
+    int ret;
+    if (upload_path) {
+        ret = send_file(ufd, (char *)upload_path);
+        if (ret == 0) printf("\nFile sent successfully\n");
+    } else {
+        ret = receive_file(ufd);
+    }
 
     close(ufd);
-    return 0;
+    return ret;
 }
