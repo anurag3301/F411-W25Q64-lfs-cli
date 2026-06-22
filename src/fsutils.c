@@ -398,6 +398,16 @@ static void ack_packet(uint8_t *packet, UART_HandleTypeDef *huart){
     HAL_UART_Transmit(huart, (uint8_t *)&crc, 4, HAL_MAX_DELAY);
 }
 
+static bool send_packet_to_pc(uint8_t *packet, UART_HandleTypeDef *huart){
+    packet_count++;
+    ((uint32_t *)packet)[32] = packet_count;
+    HAL_UART_Transmit(huart, packet, 128, HAL_MAX_DELAY);
+    uint32_t pc_crc;
+    if (HAL_UART_Receive(huart, (uint8_t *)&pc_crc, 4, 2000) == HAL_TIMEOUT)
+        return false;
+    return pc_crc == crc33_stm32(packet);
+}
+
 void path_dump(char* path, void* param){
     int len = strlen(path);
     path[len] = '\n';
@@ -431,9 +441,29 @@ void send_file(lfs_t *lfs, UART_HandleTypeDef *huart){
         HAL_UART_Transmit(huart, (uint8_t *)&reject, 4, HAL_MAX_DELAY);
         return;
     }
+    lfs_file_t file;
+    if (lfs_file_open(lfs, &file, path, LFS_O_RDONLY) < 0){
+        uint32_t reject = NOFILE_ERR;
+        HAL_UART_Transmit(huart, (uint8_t *)&reject, 4, HAL_MAX_DELAY);
+        return;
+    }
     ack_packet(packet, huart);
 
+    uint8_t data_packet[128+4] = {0};
+    ((uint32_t *)data_packet)[0] = (uint32_t)info.size;
+    strncpy((char *)data_packet + 4, info.name, 20);
+    if (!send_packet_to_pc(data_packet, huart)) {
+        lfs_file_close(lfs, &file);
+        return;
+    }
 
+    lfs_ssize_t n;
+    while ((n = lfs_file_read(lfs, &file, data_packet, 128)) > 0) {
+        if (n < 128) memset(data_packet + n, 0, 128 - n);
+        if (!send_packet_to_pc(data_packet, huart)) break;
+    }
+
+    lfs_file_close(lfs, &file);
 }
 
 

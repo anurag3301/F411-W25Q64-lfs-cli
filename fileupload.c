@@ -131,6 +131,14 @@ static uint32_t crc33_stm32(const uint8_t *data, size_t len){
 }
 
 
+static bool recv_packet_from_mcu(uint8_t *packet, int fd){
+    if (read_all(fd, packet, 128) < 0) return false;
+    packet_count++;
+    ((uint32_t *)packet)[32] = packet_count;
+    uint32_t our_crc = crc33_stm32(packet, 132);
+    return write_all(fd, (uint8_t *)&our_crc, 4) == 0;
+}
+
 static bool send_packet(uint8_t *packet, int fd){
     uint32_t board_crc, our_crc;
 
@@ -255,6 +263,32 @@ int receive_file(int ufd){
     }
 
     printf("\nReceiving packets!!\n");
+
+    uint8_t meta_packet[128+4] = {0};
+    if (!recv_packet_from_mcu(meta_packet, ufd)) return 1;
+    uint32_t filesize = ((uint32_t *)meta_packet)[0];
+    char filename[21];
+    memcpy(filename, meta_packet + 4, 20);
+    filename[20] = '\0';
+
+    char *local_name = strrchr(path, '/');
+    local_name = local_name ? local_name + 1 : path;
+    printf("Receiving: %s (%u bytes) -> ./%s\n", filename, filesize, local_name);
+
+    int out_fd = open(local_name, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (out_fd < 0) { perror("open output"); return 1; }
+
+    uint32_t remaining = filesize;
+    uint8_t data_packet[128+4] = {0};
+    while (remaining > 0) {
+        if (!recv_packet_from_mcu(data_packet, ufd)) break;
+        size_t to_write = remaining < 128 ? remaining : 128;
+        write(out_fd, data_packet, to_write);
+        remaining -= to_write;
+    }
+
+    close(out_fd);
+    printf("Saved: ./%s\n", local_name);
     return 0;
 }
 
