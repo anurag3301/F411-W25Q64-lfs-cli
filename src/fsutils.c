@@ -451,7 +451,7 @@ void send_file(lfs_t *lfs, UART_HandleTypeDef *huart){
 
     uint8_t data_packet[128+4] = {0};
     ((uint32_t *)data_packet)[0] = (uint32_t)info.size;
-    strncpy((char *)data_packet + 4, info.name, 20);
+    strncpy((char *)data_packet + 4, info.name, 100);
     if (!send_packet_to_pc(data_packet, huart)) {
         lfs_file_close(lfs, &file);
         return;
@@ -481,12 +481,12 @@ void receive_file(lfs_t *lfs, UART_HandleTypeDef *huart){
     static char newpath[500];
 
     if(!recv_packet(packet, huart)) return;
-    packet[24] = '\0';
+    packet[104] = '\0';
 
     uint32_t filesize = ((uint32_t*)packet)[0];
-    char filename[21];
-    memcpy(filename, packet+4, 20);
-    filename[20] = '\0';
+    char filename[101];
+    memcpy(filename, packet+4, 100);
+    filename[100] = '\0';
     pathjoin(newpath, cwd, filename);
 
     if (lfs_stat(lfs, newpath, &info) == LFS_ERR_OK) {

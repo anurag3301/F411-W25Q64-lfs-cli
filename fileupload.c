@@ -232,7 +232,9 @@ int send_file(int ufd, char *filename){
     uint8_t packet[128+4] = {0};
     uint32_t *words = (uint32_t*)packet;
     words[0] = getFileSize(filename);
-    sprintf(packet+4, "%s", filename);
+    const char *basename = strrchr(filename, '/');
+    basename = basename ? basename + 1 : filename;
+    sprintf(packet+4, "%s", basename);
     if(!send_packet(packet, ufd)) return 1;
 
     ssize_t n;
@@ -267,9 +269,9 @@ int receive_file(int ufd){
     uint8_t meta_packet[128+4] = {0};
     if (!recv_packet_from_mcu(meta_packet, ufd)) return 1;
     uint32_t filesize = ((uint32_t *)meta_packet)[0];
-    char filename[21];
-    memcpy(filename, meta_packet + 4, 20);
-    filename[20] = '\0';
+    char filename[101];
+    memcpy(filename, meta_packet + 4, 100);
+    filename[100] = '\0';
 
     char *local_name = strrchr(path, '/');
     local_name = local_name ? local_name + 1 : path;
