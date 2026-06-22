@@ -7,6 +7,9 @@
 
 ```
 
+<img width="400" alt="FS_bb" src="https://github.com/user-attachments/assets/812e3ff2-332c-417d-b261-1688b7db0eb9" />
+
+
 An interactive filesystem shell for the STM32F411CE (BlackPill) backed by a W25Q64 SPI NOR flash chip running LittleFS. A companion PC tool (`pcfstool`) lets you transfer files over the same UART connection.
 
 ## Hardware
@@ -92,5 +95,7 @@ pio run -t upload  # build and flash
 
 Managed automatically by PlatformIO (`platformio.ini`):
 
-- [`anurag3301/W25Q64-lfs`](https://registry.platformio.org/libraries/anurag3301/W25Q64-lfs) — W25Q64 driver + LittleFS block device adapter
-- LittleFS (pulled in transitively)
+- [`STM32-pio-libs/W25Q64-flash`](https://github.com/STM32-pio-libs/W25Q64-flash) - W25Q64 driver
+- [`STM32-pio-libs/W25Q64-lfs`](https://github.com/STM32-pio-libs/W25Q64-lfs) - LittleFS block device adapter for W25Q64
+- [`STM32-pio-libs/littlefs`](https://github.com/STM32-pio-libs/littlefs) - LittleFS sources
+
