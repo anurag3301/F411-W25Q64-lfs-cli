@@ -17,6 +17,7 @@ enum FIO_ERR{
     CREATE_ERR = 0xF3F3F3F3,
     NOEXSITS_ERR = 0xF4F4F4F4,
     NOFILE_ERR = 0xF5F5F5F5,
+    NOSPACE_ERR = 0xF6F6F6F6,
 };
 
 static uint8_t our_xor = 0;
@@ -170,6 +171,9 @@ static bool send_packet(uint8_t *packet, int fd){
         }
         else if(board_crc == NOFILE_ERR){
             printf("\nTerminated due to specified path is not regular file!\n");
+        }
+        else if(board_crc == NOSPACE_ERR){
+            printf("\nTerminated: not enough space on device!\n");
         }
         else{
             printf("\nTerminated due to integrity mismatch, maybe retry!\n");

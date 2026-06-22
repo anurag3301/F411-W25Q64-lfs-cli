@@ -489,6 +489,15 @@ void receive_file(lfs_t *lfs, UART_HandleTypeDef *huart){
     filename[100] = '\0';
     pathjoin(newpath, cwd, filename);
 
+    lfs_ssize_t used_blocks = lfs_fs_size(lfs);
+    uint32_t free_bytes = (used_blocks < 0) ? 0
+        : (lfs_cfg.block_count - (uint32_t)used_blocks) * lfs_cfg.block_size;
+    if (free_bytes < filesize) {
+        uint32_t reject = NOSPACE_ERR;
+        HAL_UART_Transmit(huart, (uint8_t *)&reject, 4, HAL_MAX_DELAY);
+        return;
+    }
+
     if (lfs_stat(lfs, newpath, &info) == LFS_ERR_OK) {
         uint32_t reject = EXISTS_ERR;
         HAL_UART_Transmit(huart, (uint8_t *)&reject, 4, HAL_MAX_DELAY);
