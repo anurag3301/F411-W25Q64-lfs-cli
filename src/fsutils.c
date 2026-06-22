@@ -426,7 +426,14 @@ void send_file(lfs_t *lfs, UART_HandleTypeDef *huart){
         HAL_UART_Transmit(huart, (uint8_t *)&reject, 4, HAL_MAX_DELAY);
         return;
     }
+    if (info.type != LFS_TYPE_REG) {
+        uint32_t reject = NOFILE_ERR;
+        HAL_UART_Transmit(huart, (uint8_t *)&reject, 4, HAL_MAX_DELAY);
+        return;
+    }
     ack_packet(packet, huart);
+
+
 }
 
 

@@ -16,6 +16,7 @@ enum FIO_ERR{
     EXISTS_ERR = 0xF2F2F2F2,
     CREATE_ERR = 0xF3F3F3F3,
     NOEXSITS_ERR = 0xF4F4F4F4,
+    NOFILE_ERR = 0xF5F5F5F5,
 };
 
 static uint8_t our_xor = 0;
@@ -148,19 +149,22 @@ static bool send_packet(uint8_t *packet, int fd){
     }
     if(board_crc != our_crc){
         if(board_crc == TIMEOUT_ERR){
-            printf("\nTerminated due to timeout!");
+            printf("\nTerminated due to timeout!\n");
         }
         else if(board_crc == EXISTS_ERR){
-            printf("\nTerminated due to file exists!");
+            printf("\nTerminated due to file exists!\n");
         }
         else if(board_crc == CREATE_ERR){
-            printf("\nTerminated due to coundnt crate file!");
+            printf("\nTerminated due to coundnt crate file!\n");
         }
         else if(board_crc == NOEXSITS_ERR){
-            printf("\nTerminated due to file doesnt exsits!");
+            printf("\nTerminated due to file doesnt exsits!\n");
+        }
+        else if(board_crc == NOFILE_ERR){
+            printf("\nTerminated due to specified path is not regular file!\n");
         }
         else{
-            printf("\nTerminated due to integrity mismatch, maybe retry!");
+            printf("\nTerminated due to integrity mismatch, maybe retry!\n");
         }
         return false;
     }

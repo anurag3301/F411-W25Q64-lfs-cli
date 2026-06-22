@@ -9,6 +9,7 @@ enum FIO_ERR{
     EXISTS_ERR = 0xF2F2F2F2,
     CREATE_ERR = 0xF3F3F3F3,
     NOEXSITS_ERR = 0xF4F4F4F4,
+    NOFILE_ERR = 0xF5F5F5F5,
 };
 
 lfs_t setup_lfs();
