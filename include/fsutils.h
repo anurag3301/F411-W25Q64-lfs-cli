@@ -10,9 +10,10 @@ enum FIO_ERR{
     CREATE_ERR = 0xF3F3F3F3,
     NOEXSITS_ERR = 0xF4F4F4F4,
     NOFILE_ERR = 0xF5F5F5F5,
+    NOSPACE_ERR = 0xF6F6F6F6,
 };
 
-lfs_t setup_lfs();
+lfs_t setup_lfs(GPIO_TypeDef *cs_port, uint16_t cs_pin);
 const char* getcwd();
 void listdir(lfs_t *lfs, const char* dir);
 void makedir(lfs_t *lfs, const char *dirname);

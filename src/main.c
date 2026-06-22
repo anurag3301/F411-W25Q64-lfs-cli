@@ -7,12 +7,18 @@ SPI_HandleTypeDef  spi1;
 
 void print_help(){
     printf("Available commands:\n\r");
-    printf("  ls [path]      List files and directories\n\r");
-    printf("  cat <file>     Display file contents\n\r");
-    printf("  cd <dir>       Change current directory\n\r");
-    printf("  mkdir <dir>    Create a new directory\n\r");
+    printf("  ls [path]      List directory contents\n\r");
+    printf("  lsr [path]     Recursively list all files\n\r");
+    printf("  cat <file>     Print file contents\n\r");
+    printf("  touch <file>   Create a new file (prompts for content)\n\r");
+    printf("  mkdir <dir>    Create a directory\n\r");
+    printf("  rm <path>      Recursively remove a file or directory\n\r");
+    printf("  cd [dir]       Change directory (no arg goes to /)\n\r");
     printf("  pwd            Print current directory\n\r");
-    printf("  help [cmd]     Show help information\n\r");
+    printf("  info           Show filesystem disk usage\n\r");
+    printf("  receive        Receive a file from the PC\n\r");
+    printf("  send           Send a file to the PC\n\r");
+    printf("  help           Show this message\n\r");
 }
 
 
