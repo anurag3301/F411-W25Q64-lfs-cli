@@ -124,6 +124,21 @@ void print_banner(void){
 }
 
 int main(){
+    /*
+     * Pin connections
+     * ---------------
+     * UART1  PA9  → TX  (connect to RX of USB-UART adapter)
+     *        PA10 → RX  (connect to TX of USB-UART adapter)
+     *
+     * SPI1   PA5  → SCK
+     *        PA6  → MISO
+     *        PA7  → MOSI
+     *
+     * W25Q64 PA4  → CS  (active low, software controlled)
+     *
+     * LED    PC13 → hardfault indicator (active low, onboard)
+     */
+
     HAL_Init();
     SystemClock_Config();
     enable_gpio();
@@ -132,8 +147,17 @@ int main(){
     setup_spi1();
     setvbuf(stdout, NULL, _IONBF, 0);
 
+    GPIO_InitTypeDef cs_gpio = {
+        .Pin   = GPIO_PIN_4,
+        .Mode  = GPIO_MODE_OUTPUT_PP,
+        .Pull  = GPIO_NOPULL,
+        .Speed = GPIO_SPEED_FREQ_VERY_HIGH,
+    };
+    HAL_GPIO_Init(GPIOA, &cs_gpio);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+
     print_banner();
-    lfs_t lfs = setup_lfs();
+    lfs_t lfs = setup_lfs(GPIOA, GPIO_PIN_4);
     char s[100];
 
     while (1) { 

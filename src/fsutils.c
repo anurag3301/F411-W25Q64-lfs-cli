@@ -1,15 +1,13 @@
 #include "fsutils.h"
 
-#define FLASH_CS_PORT GPIOA
-#define FLASH_CS_PIN  GPIO_PIN_4
-
 extern SPI_HandleTypeDef  spi1;
+static GPIO_TypeDef      *flash_cs_port;
+static uint16_t           flash_cs_pin;
 static W25Q_LFS_Context lfs_ctx;
 static struct lfs_config       lfs_cfg;
 static W25Q_Config flash;
 static char cwd[500] = "/";
 static uint32_t packet_count = 0;
-static uint8_t pos = 0;
 
 static inline size_t min(size_t a, size_t b){
     return (a < b) ? a : b;
@@ -21,18 +19,18 @@ static int32_t flash_spi_transfer(void          *user_context,
                                   size_t         length)
 {
     SPI_HandleTypeDef *spi = (SPI_HandleTypeDef *)user_context;
- 
+
     if ((spi == NULL) || (tx == NULL) || (rx == NULL) || (length == 0U)) {
         return W25Q_ERR_INVALID_ARG;
     }
- 
-    HAL_GPIO_WritePin(FLASH_CS_PORT, FLASH_CS_PIN, GPIO_PIN_RESET);
+
+    HAL_GPIO_WritePin(flash_cs_port, flash_cs_pin, GPIO_PIN_RESET);
     HAL_StatusTypeDef result = HAL_SPI_TransmitReceive(spi,
                                                         (uint8_t *)tx, rx,
                                                         (uint16_t)length,
                                                         HAL_MAX_DELAY);
-    HAL_GPIO_WritePin(FLASH_CS_PORT, FLASH_CS_PIN, GPIO_PIN_SET);
- 
+    HAL_GPIO_WritePin(flash_cs_port, flash_cs_pin, GPIO_PIN_SET);
+
     return (result == HAL_OK) ? W25Q_OK : W25Q_ERR_IO;
 }
 
@@ -41,14 +39,10 @@ static void delay_ms(void *user_context, uint32_t delay_ms){
     HAL_Delay(delay_ms);
 }
 
-lfs_t setup_lfs(){
-    GPIO_InitTypeDef cs_gpio = {
-        .Pin = FLASH_CS_PIN, .Mode = GPIO_MODE_OUTPUT_PP,
-        .Pull = GPIO_NOPULL, .Speed = GPIO_SPEED_FREQ_VERY_HIGH,
-    };
-    HAL_GPIO_Init(FLASH_CS_PORT, &cs_gpio);
-    HAL_GPIO_WritePin(FLASH_CS_PORT, FLASH_CS_PIN, GPIO_PIN_SET);
- 
+lfs_t setup_lfs(GPIO_TypeDef *cs_port, uint16_t cs_pin){
+    flash_cs_port = cs_port;
+    flash_cs_pin  = cs_pin;
+
     flash = (W25Q_Config){
         .transfer_fn  = flash_spi_transfer,
         .delay_ms_fn  = delay_ms,
